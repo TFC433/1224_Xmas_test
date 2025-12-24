@@ -51,14 +51,22 @@ const SalesAnalysisComponents = {
     },
 
     getMainLayout: function(start, end) {
+        // 若 start/end 為 null 或空值，則不填入 input value
+        const sVal = start || '';
+        const eVal = end || '';
+        const rangeText = (start && end) ? `${start} - ${end}` : '全歷史資料';
+
         return `
             <div class="dashboard-widget">
                 <div class="widget-header" style="align-items: flex-start;">
-                    <div><h2 class="widget-title">績效概覽</h2><p id="sales-date-range-display" style="color: var(--text-muted); font-size: 0.9rem; margin-top: 5px;">資料期間：${start} - ${end}</p></div>
+                    <div><h2 class="widget-title">績效概覽</h2><p id="sales-date-range-display" style="color: var(--text-muted); font-size: 0.9rem; margin-top: 5px;">資料期間：${rangeText}</p></div>
                     <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-                        <div class="form-group" style="margin-bottom: 0;"><label class="form-label" style="font-size: 0.8rem;">開始日期</label><input type="date" id="sales-start-date" class="form-input form-input-sm" value="${start}"></div>
-                        <div class="form-group" style="margin-bottom: 0;"><label class="form-label" style="font-size: 0.8rem;">結束日期</label><input type="date" id="sales-end-date" class="form-input form-input-sm" value="${end}"></div>
-                        <button class="action-btn primary" style="height: 40px; margin-top: 20px;" onclick="refreshSalesAnalysis()">查詢</button>
+                        <div class="form-group" style="margin-bottom: 0;"><label class="form-label" style="font-size: 0.8rem;">開始日期</label><input type="date" id="sales-start-date" class="form-input form-input-sm" value="${sVal}"></div>
+                        <div class="form-group" style="margin-bottom: 0;"><label class="form-label" style="font-size: 0.8rem;">結束日期</label><input type="date" id="sales-end-date" class="form-input form-input-sm" value="${eVal}"></div>
+                        <div style="display:flex; gap:10px; margin-top: 20px;">
+                            <button id="sales-refresh-btn" class="action-btn primary" style="height: 40px;">查詢</button>
+                            <button id="sales-clear-btn" class="action-btn secondary" style="height: 40px;">清除篩選</button>
+                        </div>
                     </div>
                 </div>
                 <div id="sales-overview-content" class="widget-content"><div class="loading show"><div class="spinner"></div></div></div>
