@@ -19,10 +19,13 @@ class SystemWriter extends BaseWriter {
         // 密碼位於 B 欄 (第二欄)
         const range = `使用者名冊!B${rowIndex}`;
 
-        console.log(`🔐 [SystemWriter] 更新密碼 Hash (Row: ${rowIndex}, Target: ...${targetSheetId.slice(-6)})...`);
+        console.log(`🔐 [SystemWriter Debug] 開始執行 updatePassword`);
+        console.log(`   - Row Index: ${rowIndex}`);
+        console.log(`   - Target Range: ${range}`);
+        console.log(`   - Target Sheet ID: ${targetSheetId} (Length: ${targetSheetId ? targetSheetId.length : 0})`);
 
         try {
-            await this.sheets.spreadsheets.values.update({
+            const response = await this.sheets.spreadsheets.values.update({
                 spreadsheetId: targetSheetId,
                 range: range,
                 valueInputOption: 'RAW',
@@ -30,9 +33,14 @@ class SystemWriter extends BaseWriter {
                     values: [[newHash]]
                 }
             });
+
+            console.log(`✅ [SystemWriter Debug] Google API 回應成功:`, response.data);
             return true;
         } catch (error) {
-            console.error('❌ [SystemWriter] 更新密碼失敗:', error.message);
+            console.error('❌ [SystemWriter Debug] Google API 呼叫失敗:', error.message);
+            if (error.response) {
+                console.error('   - Error Details:', JSON.stringify(error.response.data));
+            }
             throw error;
         }
     }

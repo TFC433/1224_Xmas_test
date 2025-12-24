@@ -20,7 +20,6 @@ const dateHelpers = {
             }
         }
         // 使用 UTC 計算以避免時區問題
-        // 【*** 修正點：已從 d.get...() 改為 d.getUTC...() ***】
         d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
         d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
         const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
@@ -118,7 +117,10 @@ function initializeBusinessServices(coreServices) {
         interactionWriter: coreServices.interactionWriter,
         eventLogWriter: coreServices.eventLogWriter,
         weeklyBusinessWriter: coreServices.weeklyBusinessWriter,
-        announcementWriter: coreServices.announcementWriter
+        announcementWriter: coreServices.announcementWriter,
+
+        // ★★★ 關鍵修正：補上 SystemWriter ★★★
+        systemWriter: coreServices.systemWriter
     };
 }
 
