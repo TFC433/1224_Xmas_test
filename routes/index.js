@@ -1,9 +1,14 @@
-// routes/index.js (修正版：開放預覽圖片 API 權限)
+// routes/index.js
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth.middleware');
 
-// --- 引入所有功能的路由 ---
+// --- 引入 Controllers ---
+// 我們直接引入 controller 來精細控制，而不是整包引入 externalRoutes
+const externalController = require('../controllers/external.controller');
+const contactController = require('../controllers/contact.controller'); 
+
+// --- 引入其他路由模組 ---
 const authRoutes = require('./auth.routes');
 const opportunityRoutes = require('./opportunity.routes');
 const systemRoutes = require('./system.routes');
@@ -15,35 +20,33 @@ const weeklyRoutes = require('./weekly.routes');
 const salesRoutes = require('./sales.routes');
 const eventRoutes = require('./event.routes');         
 const calendarRoutes = require('./calendar.routes');   
-const externalRoutes = require('./external.routes');   
 const lineLeadsRoutes = require('./line-leads.routes'); 
 
-// --- 引入特例 Controller ---
-const contactController = require('../controllers/contact.controller'); 
-
-// --- 掛載路由 ---
-
 // ==========================================
-// 1. 公開路由 (不需要 Token 驗證)
+// 1. 【公開區域】危險性低或必須公開的 API
 // ==========================================
 
-// 登入相關
+// 登入
 router.use('/auth', authRoutes);
 
-// LINE LIFF 專用 (名片牆)
+// LINE LIFF 相關 (由 Controller 內部檢查 Token，所以這裡路由本身是公開的)
 router.use('/line', lineLeadsRoutes); 
 
-// 【修正重點】將 External Routes (包含 /drive/thumbnail) 移到這裡
-// 這樣 leads-view.html 才能在不登入 CRM 的情況下預覽圖片
-router.use('/', externalRoutes);
+// ★ 修正重點：只開放「縮圖預覽」給外部 (例如讓 LINE 裡看得到圖片)
+// 這樣做不會消耗大量資源，也沒有敏感資料
+router.get('/drive/thumbnail', externalController.getDriveThumbnail);
 
 
 // ==========================================
-// 2. 受保護的路由 (所有在此之後的路由都需要 Token 驗證)
+// 2. 【保護區域】必須登入才能使用的 API (Token 驗證閘門)
 // ==========================================
-router.use(authMiddleware.verifyToken); // <-- 驗證閘門
+router.use(authMiddleware.verifyToken); // <--- 驗證閘門
 
-// 掛載所有需要保護的模組
+// ★ 修正重點：將「AI 生成公司簡介」移到保護區
+// 這樣只有登入的員工才能觸發 Gemini 和 Google Search，防止費用暴增
+router.post('/companies/:companyName/generate-profile', externalController.generateCompanyProfile);
+
+// 掛載其他業務模組
 router.use('/opportunities', opportunityRoutes);
 router.use('/', systemRoutes);
 router.use('/announcements', announcementRoutes);
@@ -54,14 +57,11 @@ router.use('/business/weekly', weeklyRoutes);
 router.use('/sales-analysis', salesRoutes);
 router.use('/events', eventRoutes);         
 router.use('/calendar', calendarRoutes);   
-// router.use('/', externalRoutes); // <--- 原本在這裡，已移到上面
 
-
-// 【特例處理】匹配: GET /api/contact-list
+// 特例處理 (搜尋聯絡人)
 router.get('/contact-list', contactController.searchContactList);
 
-
-// 3. API 404 處理
+// 404 處理
 router.use('*', (req, res) => {
     res.status(404).json({ success: false, error: 'API 端點不存在' });
 });

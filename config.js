@@ -6,6 +6,11 @@ module.exports = {
     
     // Google Sheets 設定 (已移除寫死ID)
     SPREADSHEET_ID: process.env.SPREADSHEET_ID,
+
+    // ★★★ 【新增】權限管理專用 Sheet ID ★★★
+    // 用於讀取「使用者名冊」。
+    // 優先讀取 AUTH_SPREADSHEET_ID 環境變數；若未設定，則使用原本的 SPREADSHEET_ID (向下相容)
+    AUTH_SPREADSHEET_ID: process.env.AUTH_SPREADSHEET_ID || process.env.SPREADSHEET_ID,
     
     // Google Drive 設定 (已移除寫死ID)
     DRIVE_FOLDER_ID: process.env.DRIVE_FOLDER_ID,

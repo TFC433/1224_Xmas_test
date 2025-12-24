@@ -12,6 +12,7 @@ class SystemReader extends BaseReader {
 
     /**
      * 取得系統設定工作表內容
+     * (這個依然讀取舊的、共用的 Sheet)
      * @returns {Promise<object>}
      */
     async getSystemConfig() {
@@ -25,6 +26,7 @@ class SystemReader extends BaseReader {
 
         console.log(`🔄 [API] 從 Google Sheet 讀取 ${cacheKey}...`);
         try {
+            // ★ 明確指定使用 SPREADSHEET_ID (業務資料表)
             const response = await this.sheets.spreadsheets.values.get({
                 spreadsheetId: this.config.SPREADSHEET_ID,
                 // 【修改】擴大讀取範圍到 I 欄 (第9欄) 用來讀取分類
@@ -95,20 +97,53 @@ class SystemReader extends BaseReader {
 
     /**
      * 取得使用者名冊
+     * (★ 修改重點：改為讀取 AUTH_SPREADSHEET_ID)
      * @returns {Promise<Array<object>>}
      */
     async getUsers() {
         const cacheKey = 'users';
         const range = '使用者名冊!A:C';
+        
+        // ★ 這裡指定去讀取權限專用表 (若無新表ID，自動 fallback 回舊表ID)
+        const targetSheetId = this.config.AUTH_SPREADSHEET_ID || this.config.SPREADSHEET_ID;
 
-        const rowParser = (row) => ({
-            username: row[0],
-            passwordHash: row[1],
-            displayName: row[2]
-        });
+        // 檢查快取
+        const now = Date.now();
+        if (this.cache[cacheKey] && this.cache[cacheKey].data && (now - this.cache[cacheKey].timestamp < this.CACHE_DURATION)) {
+            // console.log(`✅ [Cache] 從快取讀取 ${cacheKey}...`); // 減少 log 雜訊
+            return this.cache[cacheKey].data;
+        }
 
-        const allUsers = await this._fetchAndCache(cacheKey, range, rowParser);
-        return allUsers.filter(user => user.username && user.passwordHash);
+        console.log(`🔐 [Auth] 讀取使用者名冊 (Sheet ID: ...${targetSheetId.slice(-6)})...`);
+
+        try {
+            // 我們手動呼叫 API，而不使用 BaseReader._fetchAndCache
+            // 因為我們要指定 spreadsheetId，而 BaseReader 預設是用 this.config.SPREADSHEET_ID
+            const response = await this.sheets.spreadsheets.values.get({
+                spreadsheetId: targetSheetId,
+                range: range,
+            });
+
+            const rows = response.data.values || [];
+            
+            const rowParser = (row) => ({
+                username: row[0],
+                passwordHash: row[1],
+                displayName: row[2]
+            });
+
+            // 解析並過濾資料
+            const allUsers = rows.map(rowParser).filter(user => user.username && user.passwordHash);
+
+            // 寫入快取
+            this.cache[cacheKey] = { data: allUsers, timestamp: now };
+            return allUsers;
+
+        } catch (error) {
+            console.error('❌ [DataReader] 讀取使用者名冊失敗:', error.message);
+            // 如果讀取失敗 (例如權限不足)，回傳空陣列，避免系統崩潰
+            return [];
+        }
     }
 }
 

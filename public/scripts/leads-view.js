@@ -187,10 +187,24 @@ async function loadLeadsData() {
     if(gridEl) gridEl.style.display = 'none';
     
     try {
+        // 【安全性修正】改用 Authorization Header 傳送 Token
         const headers = { 
-            'Content-Type': 'application/json',
-            'x-line-userid': currentUser.userId 
+            'Content-Type': 'application/json'
         };
+
+        if (currentUser.userId === 'TEST_LOCAL_USER') {
+            // 本地開發模式使用的假 Token (需後端配合或 Bypass)
+            headers['Authorization'] = 'Bearer TEST_LOCAL_TOKEN';
+        } else {
+            // 正式環境：取得 LIFF ID Token
+            const idToken = liff.getIDToken();
+            if (idToken) {
+                headers['Authorization'] = `Bearer ${idToken}`;
+            } else {
+                console.warn('無法取得 LIFF ID Token');
+                // 這裡可能會導致後端回傳 401，這是預期行為
+            }
+        }
 
         const response = await fetch('/api/line/leads', { headers });
         const result = await response.json();
@@ -198,6 +212,13 @@ async function loadLeadsData() {
         if (response.status === 403) {
             toggleContentVisibility(false);
             showAccessDenied(result.yourUserId);
+            return;
+        }
+
+        if (response.status === 401) {
+            alert('登入憑證過期或無效，請重新登入');
+            liff.logout();
+            location.reload();
             return;
         }
 
@@ -251,7 +272,6 @@ function renderLeads() {
     grid.innerHTML = filtered.map(lead => createCardHTML(lead)).join('');
 }
 
-// 【重點修改】createCardHTML：控制編輯按鈕顯示邏輯
 function createCardHTML(lead) {
     const isMine = (lead.lineUserId === currentUser.userId);
     const ownerName = lead.userNickname || 'Unknown';
@@ -265,7 +285,7 @@ function createCardHTML(lead) {
         ? `<div class="lead-position">${safeHtml(lead.position)}</div>` 
         : '';
 
-    // 【修改這裡】加入 currentView === 'mine' 的判斷
+    // 控制編輯按鈕顯示邏輯
     // 條件：必須是自己的名片 (isMine) 且 目前必須在「我的」頁籤 (currentView === 'mine')
     const showEditBtn = isMine && (currentView === 'mine');
 
@@ -357,10 +377,19 @@ async function handleEditSubmit(e) {
     if (notes) data.notes = notes;
 
     try {
+        // 【安全性修正】改用 Authorization Header 傳送 Token
         const headers = { 
-            'Content-Type': 'application/json',
-            'x-line-userid': currentUser.userId 
+            'Content-Type': 'application/json'
         };
+
+        if (currentUser.userId === 'TEST_LOCAL_USER') {
+            headers['Authorization'] = 'Bearer TEST_LOCAL_TOKEN';
+        } else {
+            const idToken = liff.getIDToken();
+            if (idToken) {
+                headers['Authorization'] = `Bearer ${idToken}`;
+            }
+        }
 
         const res = await fetch(`/api/line/leads/${rowIndex}`, {
             method: 'PUT',
@@ -370,6 +399,11 @@ async function handleEditSubmit(e) {
         
         if (res.status === 403) {
             alert('您沒有權限執行此操作');
+            return;
+        }
+
+        if (res.status === 401) {
+            alert('登入憑證已過期');
             return;
         }
 
