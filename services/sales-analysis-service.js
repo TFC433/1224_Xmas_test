@@ -66,9 +66,22 @@ class SalesAnalysisService {
             }
         }
 
-        // 2. 預設時間範圍 (僅用於趨勢圖的 X 軸範圍)
-        const endDate = endDateISO ? new Date(endDateISO) : new Date();
-        const startDate = startDateISO ? new Date(startDateISO) : new Date(endDate.getTime() - 365 * 24 * 60 * 60 * 1000);
+        // 2. 決定是否進行時間篩選 & 趨勢圖 X 軸範圍
+        let startDate, endDate;
+        let filterByDate = false;
+
+        if (startDateISO && endDateISO) {
+            // 使用者指定範圍：進行篩選
+            endDate = new Date(endDateISO);
+            startDate = new Date(startDateISO);
+            filterByDate = true;
+        } else {
+            // 無指定範圍：不篩選 (全歷史)，但需設定趨勢圖範圍
+            endDate = new Date();
+            // 預設趨勢圖往前推兩年，確保有足夠跨度，實際會依據資料調整
+            startDate = new Date(endDate.getTime() - 730 * 24 * 60 * 60 * 1000);
+        }
+
         endDate.setHours(23, 59, 59, 999);
         startDate.setHours(0, 0, 0, 0);
 
@@ -99,14 +112,19 @@ class SalesAnalysisService {
                 return valB - valA; // 預設依日期降序
             });
 
-        // 依據時間範圍過濾
-        if (startDate && endDate) {
+        // 依據時間範圍過濾 (僅當 filterByDate 為真時)
+        if (filterByDate) {
             wonDeals = wonDeals.filter(deal => {
                 const dealDate = new Date(deal.wonDate);
-                // 比較時只考慮日期部分，或直接比較時間戳
-                // startDate 和 endDate 已經被處理為當天的 00:00:00 和 23:59:59
                 return dealDate >= startDate && dealDate <= endDate;
             });
+        } else if (wonDeals.length > 0) {
+            // 若為全歷史模式，自動調整趨勢圖的起始時間以涵蓋最早的一筆資料
+            const minDate = new Date(Math.min(...wonDeals.map(d => new Date(d.wonDate).getTime())));
+            if (!isNaN(minDate.getTime()) && minDate < startDate) {
+                startDate = minDate;
+                startDate.setHours(0, 0, 0, 0);
+            }
         }
 
         // 5. 初始概覽 (Overview)
