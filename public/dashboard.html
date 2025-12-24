@@ -8,6 +8,8 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" sizes="any">
 
     <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/user-profile.css">
+
     <script src="https://code.highcharts.com/maps/highmaps.js"></script>
     <script src="https://code.highcharts.com/maps/modules/data.js"></script>
     <script src="https://code.highcharts.com/mapdata/countries/tw/tw-all.js"></script>
@@ -112,7 +114,12 @@
                         </svg>
                         <span class="btn-text">資料已更新，請點此重整</span>
                     </button>
-                    <div class="user-info" id="user-display"><span id="user-display-name"></span></div>
+
+                    <div class="user-info" id="user-display" onclick="UserProfile.open()" style="cursor: pointer; padding: 5px 10px; border-radius: 20px; transition: background 0.2s;" title="查看個人檔案">
+                        <span id="user-display-name">User</span>
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:5px; vertical-align: middle;"><path d="M6 9l6 6 6-6"/></svg>
+                    </div>
+
                     <button class="action-btn danger" onclick="logout()" title="登出">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                         <span class="btn-text">登出</span>
@@ -270,6 +277,81 @@
                 <div id="page-announcements" class="page-view" style="display: none;"></div>
             </div>
         </main>
+    </div>
+
+    <div id="user-profile-modal" class="profile-modal">
+        <div class="profile-card">
+            <button type="button" class="close-profile-btn" onclick="UserProfile.close()" title="關閉">
+                &times;
+            </button>
+
+            <div class="profile-views" id="profile-views">
+                
+                <div class="view-section" id="view-profile">
+                    <div class="profile-header">
+                        <div class="avatar-large" id="profile-avatar">U</div>
+                        <h2 id="profile-name-large" style="margin:0;">User</h2>
+                        <span class="user-role-badge">系統使用者</span>
+                    </div>
+
+                    <div class="profile-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">系統</div>
+                            <div class="stat-label">存取權限</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">活躍</div>
+                            <div class="stat-label">帳號狀態</div>
+                        </div>
+                    </div>
+
+                    <button class="btn-block btn-primary-action" onclick="UserProfile.switchView('password')">
+                        🔐 修改密碼
+                    </button>
+                    <button class="btn-block btn-logout" onclick="logout()">
+                        登出系統
+                    </button>
+                </div>
+
+                <div class="view-section" id="view-password">
+                    <button class="back-btn" onclick="UserProfile.switchView('profile')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                        返回個人檔案
+                    </button>
+
+                    <h3 style="margin-top:0; margin-bottom:20px;">設定新密碼</h3>
+                    
+                    <form id="change-password-form">
+                        <div class="input-group">
+                            <label>目前密碼</label>
+                            <input type="password" id="cp-old" class="form-control" placeholder="請輸入舊密碼">
+                            <div class="feedback-text" id="fb-old"></div>
+                        </div>
+
+                        <div class="input-group">
+                            <label>新密碼</label>
+                            <input type="password" id="cp-new" class="form-control" placeholder="至少 6 碼">
+                            <div class="strength-meter" id="strength-meter">
+                                <div class="strength-segment"></div>
+                                <div class="strength-segment"></div>
+                                <div class="strength-segment"></div>
+                            </div>
+                            <div class="feedback-text" id="fb-new"></div>
+                        </div>
+
+                        <div class="input-group">
+                            <label>確認新密碼</label>
+                            <input type="password" id="cp-confirm" class="form-control" placeholder="再次輸入">
+                            <div class="feedback-text" id="fb-confirm"></div>
+                        </div>
+
+                        <button type="submit" id="btn-save-password" class="btn-block btn-primary-action" disabled>
+                            確認修改
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="modal-container"></div>

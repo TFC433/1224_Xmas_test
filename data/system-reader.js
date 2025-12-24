@@ -20,16 +20,15 @@ class SystemReader extends BaseReader {
         const now = Date.now();
         
         if (this.cache[cacheKey] && this.cache[cacheKey].data && (now - this.cache[cacheKey].timestamp < this.CACHE_DURATION)) {
-            console.log(`✅ [Cache] 從快取讀取 ${cacheKey}...`);
+            // console.log(`✅ [Cache] 從快取讀取 ${cacheKey}...`);
             return this.cache[cacheKey].data;
         }
 
-        console.log(`🔄 [API] 從 Google Sheet 讀取 ${cacheKey}...`);
+        // console.log(`🔄 [API] 從 Google Sheet 讀取 ${cacheKey}...`);
         try {
-            // ★ 明確指定使用 SPREADSHEET_ID (業務資料表)
+            // 這裡使用預設的 SPREADSHEET_ID (業務資料表)
             const response = await this.sheets.spreadsheets.values.get({
                 spreadsheetId: this.config.SPREADSHEET_ID,
-                // 【修改】擴大讀取範圍到 I 欄 (第9欄) 用來讀取分類
                 range: `${this.config.SHEETS.SYSTEM_CONFIG}!A:I`,
             });
             
@@ -37,7 +36,7 @@ class SystemReader extends BaseReader {
             
             const settings = {};
             
-            // 初始化事件類型 (硬編碼部分，確保基本類型存在)
+            // 初始化預設值
             if (!settings['事件類型']) {
                 settings['事件類型'] = [
                     { value: 'general', note: '一般', order: 1, color: '#6c757d' },
@@ -47,17 +46,10 @@ class SystemReader extends BaseReader {
                     { value: 'legacy', note: '舊事件', order: 5, color: '#dc3545' }
                 ];
             }
-
-            // --- 【修正】日曆篩選規則的預設值 (只留結構，不留資料) ---
-            // 確保資料結構存在，但內容為空，完全依賴 Sheet 設定
-            if (!settings['日曆篩選規則']) {
-                settings['日曆篩選規則'] = []; 
-            }
-            // --- 修正結束 ---
+            if (!settings['日曆篩選規則']) settings['日曆篩選規則'] = []; 
             
             if (rows.length > 1) {
                 rows.slice(1).forEach(row => {
-                    // 【修改】解構賦值增加 category (I欄)
                     const [type, item, order, enabled, note, color, value2, value3, category] = row;
                     
                     if (enabled === 'TRUE' && type && item) {
@@ -65,7 +57,6 @@ class SystemReader extends BaseReader {
                         
                         const exists = settings[type].find(i => i.value === item);
                         if (exists) {
-                            // 如果 Sheet 有設定，更新預設值
                             exists.note = note || item;
                             exists.order = parseInt(order) || 99;
                         } else {
@@ -74,16 +65,15 @@ class SystemReader extends BaseReader {
                                 note: note || item,
                                 order: parseInt(order) || 99,
                                 color: color || null,
-                                value2: value2 || null, // G欄: 規格單價
-                                value3: value3 || null, // H欄: 行為模式
-                                category: category || '其他' // 【新增】I欄 分類，預設為 '其他'
+                                value2: value2 || null, 
+                                value3: value3 || null, 
+                                category: category || '其他' 
                             });
                         }
                     }
                 });
             }
             
-            // 依照順序欄位排序
             Object.keys(settings).forEach(type => settings[type].sort((a, b) => a.order - b.order));
             
             this.cache[cacheKey] = { data: settings, timestamp: now };
@@ -97,14 +87,15 @@ class SystemReader extends BaseReader {
 
     /**
      * 取得使用者名冊
-     * (★ 修改重點：改為讀取 AUTH_SPREADSHEET_ID)
+     * (★ 修改重點：改為讀取 AUTH_SPREADSHEET_ID，且回傳 rowIndex)
      * @returns {Promise<Array<object>>}
      */
     async getUsers() {
         const cacheKey = 'users';
         const range = '使用者名冊!A:C';
         
-        // ★ 這裡指定去讀取權限專用表 (若無新表ID，自動 fallback 回舊表ID)
+        // ★ 這裡指定去讀取權限專用表
+        // 如果 config 沒有 AUTH_SPREADSHEET_ID，會自動 fallback 到原本的 ID
         const targetSheetId = this.config.AUTH_SPREADSHEET_ID || this.config.SPREADSHEET_ID;
 
         // 檢查快取
@@ -126,14 +117,13 @@ class SystemReader extends BaseReader {
 
             const rows = response.data.values || [];
             
-            const rowParser = (row) => ({
+            // ★★★ 關鍵修正：加入 rowIndex ★★★
+            const allUsers = rows.map((row, index) => ({
+                rowIndex: index + 1, // 紀錄這是第幾列 (1-based)，用於 Writer 更新
                 username: row[0],
                 passwordHash: row[1],
                 displayName: row[2]
-            });
-
-            // 解析並過濾資料
-            const allUsers = rows.map(rowParser).filter(user => user.username && user.passwordHash);
+            })).filter(user => user.username && user.passwordHash);
 
             // 寫入快取
             this.cache[cacheKey] = { data: allUsers, timestamp: now };

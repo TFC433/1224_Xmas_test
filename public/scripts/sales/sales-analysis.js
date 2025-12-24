@@ -20,13 +20,10 @@ async function loadSalesAnalysisPage(startDateISO, endDateISO) {
     const container = document.getElementById('page-sales-analysis');
     if (!container) return;
 
+    // 若沒有傳入日期 (初始載入)，則設為 null (代表全歷史/不篩選)
     if (!startDateISO || !endDateISO) {
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setFullYear(startDate.getFullYear() - 1);
-        startDate.setDate(startDate.getDate() + 1);
-        salesEndDate = endDate.toISOString().split('T')[0];
-        salesStartDate = startDate.toISOString().split('T')[0];
+        salesStartDate = null;
+        salesEndDate = null;
     } else {
         salesStartDate = startDateISO;
         salesEndDate = endDateISO;
@@ -37,6 +34,18 @@ async function loadSalesAnalysisPage(startDateISO, endDateISO) {
 
     // 2. 渲染基礎骨架
     container.innerHTML = SalesAnalysisComponents.getMainLayout(salesStartDate, salesEndDate);
+
+    // 綁定查詢按鈕事件
+    const refreshBtn = document.getElementById('sales-refresh-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', refreshSalesAnalysis);
+    }
+
+    // 綁定清除篩選按鈕事件
+    const clearBtn = document.getElementById('sales-clear-btn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearSalesFilter);
+    }
 
     // 3. 獲取數據
     await fetchAndRenderSalesData(salesStartDate, salesEndDate);
@@ -50,19 +59,33 @@ function refreshSalesAnalysis() {
     const startDate = startDateInput.value;
     const endDate = endDateInput.value;
 
-    if (startDate && endDate && startDate <= endDate) {
-        document.getElementById('sales-overview-content').innerHTML = '<div class="loading show"><div class="spinner"></div></div>';
-        document.getElementById('sales-kpi-content').innerHTML = '';
-        document.getElementById('won-deals-content').innerHTML = '<div class="loading show" style="padding: 20px;"><div class="spinner"></div></div>';
-        loadSalesAnalysisPage(startDate, endDate);
+    if (startDate && endDate) {
+        if (startDate <= endDate) {
+            document.getElementById('sales-overview-content').innerHTML = '<div class="loading show"><div class="spinner"></div></div>';
+            document.getElementById('sales-kpi-content').innerHTML = '';
+            document.getElementById('won-deals-content').innerHTML = '<div class="loading show" style="padding: 20px;"><div class="spinner"></div></div>';
+            loadSalesAnalysisPage(startDate, endDate);
+        } else {
+            showNotification('開始日期不能大於結束日期', 'warning');
+        }
     } else {
         showNotification('請選擇有效的開始和結束日期', 'warning');
     }
 }
 
+function clearSalesFilter() {
+    document.getElementById('sales-overview-content').innerHTML = '<div class="loading show"><div class="spinner"></div></div>';
+    document.getElementById('sales-kpi-content').innerHTML = '';
+    document.getElementById('won-deals-content').innerHTML = '<div class="loading show" style="padding: 20px;"><div class="spinner"></div></div>';
+    loadSalesAnalysisPage(null, null);
+}
+
 async function fetchAndRenderSalesData(startDate, endDate) {
     try {
-        const result = await authedFetch(`/api/sales-analysis?startDate=${startDate}&endDate=${endDate}`);
+        // 處理 null 日期：轉為空字串傳給後端
+        const sParam = startDate || '';
+        const eParam = endDate || '';
+        const result = await authedFetch(`/api/sales-analysis?startDate=${sParam}&endDate=${eParam}`);
         if (!result.success || !result.data) throw new Error(result.error || '無法獲取分析數據');
         
         salesAnalysisData = result.data;
@@ -81,7 +104,13 @@ async function fetchAndRenderSalesData(startDate, endDate) {
         renderPaginatedTable();
 
         const dRange = document.getElementById('sales-date-range-display');
-        if(dRange) dRange.textContent = `資料期間：${new Date(startDate + 'T00:00:00').toLocaleDateString('zh-TW')} - ${new Date(endDate + 'T00:00:00').toLocaleDateString('zh-TW')}`;
+        if(dRange) {
+            if (startDate && endDate) {
+                dRange.textContent = `資料期間：${new Date(startDate + 'T00:00:00').toLocaleDateString('zh-TW')} - ${new Date(endDate + 'T00:00:00').toLocaleDateString('zh-TW')}`;
+            } else {
+                dRange.textContent = `資料期間：全歷史資料`;
+            }
+        }
 
     } catch (error) {
         console.error('載入失敗:', error);

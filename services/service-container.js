@@ -1,6 +1,6 @@
-// services/service-container.js (已重構為注入所有模組 + 新增 Drive)
+// services/service-container.js
 
-const { google } = require('googleapis'); // 確保引入 google
+const { google } = require('googleapis');
 const AuthService = require('./auth-service');
 const WorkflowService = require('./workflow-service');
 const CalendarService = require('./calendar-service');
@@ -10,15 +10,14 @@ const {
     OpportunityReader, ContactReader, CompanyReader, InteractionReader,
     EventLogReader, SystemReader, WeeklyBusinessReader, AnnouncementReader,
     CompanyWriter, ContactWriter, OpportunityWriter, InteractionWriter,
-    EventLogWriter, WeeklyBusinessWriter, AnnouncementWriter
+    EventLogWriter, WeeklyBusinessWriter, AnnouncementWriter,
+    
+    // ★★★ 1. 新增引入 SystemWriter ★★★
+    SystemWriter 
 } = require('../data');
 
-// 這是應用程式服務的單例容器
 const services = {};
 
-/**
- * 初始化所有應用程式服務。這個函式在應用程式啟動時只會執行一次。
- */
 async function initializeServices() {
     if (services.isInitialized) {
         return services;
@@ -26,16 +25,16 @@ async function initializeServices() {
 
     console.log('🔧 [Service Container] 正在初始化所有服務...');
 
-    // 1. 認證服務 (最底層)
+    // 1. 認證服務
     const authService = new AuthService();
-    const authClient = await authService.getOAuthClient(); // 或者 getAuthClient()
+    const authClient = await authService.getOAuthClient();
 
     // 2. Google API 實例
     const sheets = google.sheets({ version: 'v4', auth: authClient });
     const calendar = google.calendar({ version: 'v3', auth: authClient });
-    const drive = google.drive({ version: 'v3', auth: authClient }); // **新增 Drive Client**
+    const drive = google.drive({ version: 'v3', auth: authClient });
 
-    // 3. 資料讀取層 (Readers) - 將 sheets 實例注入
+    // 3. Readers
     const opportunityReader = new OpportunityReader(sheets);
     const contactReader = new ContactReader(sheets);
     const companyReader = new CompanyReader(sheets);
@@ -50,7 +49,7 @@ async function initializeServices() {
         eventLogReader, systemReader, weeklyBusinessReader, announcementReader
     };
 
-    // 4. 資料寫入層 (Writers) - 注入 sheets 和對應的 reader
+    // 4. Writers
     const companyWriter = new CompanyWriter(sheets, companyReader);
     const contactWriter = new ContactWriter(sheets, contactReader);
     const opportunityWriter = new OpportunityWriter(sheets, opportunityReader, contactReader);
@@ -58,24 +57,30 @@ async function initializeServices() {
     const eventLogWriter = new EventLogWriter(sheets, eventLogReader, opportunityReader);
     const weeklyBusinessWriter = new WeeklyBusinessWriter(sheets, weeklyBusinessReader);
     const announcementWriter = new AnnouncementWriter(sheets, announcementReader);
+    
+    // ★★★ 2. 初始化 SystemWriter (放入 sheets) ★★★
+    const systemWriter = new SystemWriter(sheets);
 
     const writers = {
         companyWriter, contactWriter, opportunityWriter, interactionWriter,
-        eventLogWriter, weeklyBusinessWriter, announcementWriter
+        eventLogWriter, weeklyBusinessWriter, announcementWriter,
+        
+        // ★★★ 3. 加入 writers 物件中 ★★★
+        systemWriter 
     };
 
-    // 5. 工作流與日曆服務 (注入 writers 和 readers)
+    // 5. Services
     const workflowService = new WorkflowService(writers, readers, sheets);
     const calendarService = new CalendarService(authClient);
 
-    // 6. 將所有服務實例儲存到容器中，以便 app.js 使用
+    // 6. 儲存到容器
     Object.assign(services, {
         authService,
         sheets,
         calendar,
-        drive, // **將 drive client 加入 services**
+        drive,
         ...readers,
-        ...writers,
+        ...writers, // 這裡會自動包含 systemWriter
         workflowService,
         calendarService,
         isInitialized: true
@@ -85,5 +90,4 @@ async function initializeServices() {
     return services;
 }
 
-// 匯出一個函式，它回傳一個 Promise，解析後是已初始化的服務容器
 module.exports = initializeServices;
