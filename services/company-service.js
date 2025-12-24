@@ -16,6 +16,9 @@ class CompanyService {
         this.companyWriter = services.companyWriter;
         this.interactionWriter = services.interactionWriter;
         this.systemReader = services.systemReader;
+        // 【新增】注入 Writer 以支援連動更新
+        this.opportunityWriter = services.opportunityWriter;
+        this.contactWriter = services.contactWriter; 
     }
 
     /**
@@ -56,7 +59,6 @@ class CompanyService {
         const normalizedName = companyName.trim();
         if (!normalizedName) throw new Error('公司名稱不能為空');
 
-        // 1. 檢查是否已存在
         const allCompanies = await this.companyReader.getCompanyList();
         const existing = allCompanies.find(c => c.companyName.toLowerCase().trim() === normalizedName.toLowerCase());
         
@@ -69,22 +71,19 @@ class CompanyService {
             };
         }
 
-        // 2. 準備預設值 (後端自動補全，避免資料不完整)
         const defaultValues = {
             companyType: '未分類',
             customerStage: '01_初步接觸',
             engagementRating: 'C'
         };
 
-        // 3. 建立
         const newCompanyData = await this.companyWriter.getOrCreateCompany(
             normalizedName, 
-            {}, // sourceInfo
+            {}, 
             modifier, 
-            defaultValues // 預設值
+            defaultValues
         );
         
-        // 4. 寫入日誌
         await this._logCompanyInteraction(
             newCompanyData.id,
             '公司建立',
@@ -92,22 +91,22 @@ class CompanyService {
             modifier
         );
 
-        // 5. 回傳 (確保格式統一)
         return { 
             success: true, 
             data: {
                 ...newCompanyData,
-                companyName: newCompanyData.name, // 確保前端能讀到這個欄位
+                companyName: newCompanyData.name,
                 companyId: newCompanyData.id
             }
         };
     }
 
     /**
-     * 攔截並處理公司資料更新，以增加日誌
+     * 攔截並處理公司資料更新，以增加日誌與連動更新
      */
     async updateCompany(companyName, updateData, modifier) {
         const allCompanies = await this.companyReader.getCompanyList();
+        // 找出原始資料
         const originalCompany = allCompanies.find(c => c.companyName.toLowerCase().trim() === companyName.toLowerCase().trim());
         
         if (!originalCompany) {
@@ -119,6 +118,13 @@ class CompanyService {
         
         const logs = [];
 
+        // 檢查是否修改名稱 (連動更新的核心檢查)
+        const isRenaming = updateData.companyName && updateData.companyName.trim() !== originalCompany.companyName;
+        
+        if (isRenaming) {
+            logs.push(`公司名稱從 [${originalCompany.companyName}] 變更為 [${updateData.companyName}]`);
+        }
+
         if (updateData.customerStage !== undefined && updateData.customerStage !== originalCompany.customerStage) {
             logs.push(`客戶階段從 [${getNote('客戶階段', originalCompany.customerStage)}] 更新為 [${getNote('客戶階段', updateData.customerStage)}]`);
         }
@@ -129,8 +135,44 @@ class CompanyService {
             logs.push(`公司類型從 [${getNote('公司類型', originalCompany.companyType)}] 更新為 [${getNote('公司類型', updateData.companyType)}]`);
         }
 
+        // 1. 執行公司本身的更新
         const updateResult = await this.companyWriter.updateCompany(companyName, updateData, modifier);
         
+        // 2. 如果成功，且涉及改名，執行連動更新 (Cascade Update)
+        if (updateResult.success && isRenaming) {
+            console.log(`🔄 [CompanyService] 偵測到公司改名 (${originalCompany.companyName} -> ${updateData.companyName})，開始執行連動更新...`);
+            
+            try {
+                // 連動更新：機會案件
+                const allOpportunities = await this.opportunityReader.getOpportunities();
+                // 找出舊名字的所有機會
+                const relatedOpportunities = allOpportunities.filter(opp => 
+                    opp.customerCompany.toLowerCase().trim() === originalCompany.companyName.toLowerCase().trim()
+                );
+
+                if (relatedOpportunities.length > 0) {
+                    console.log(`⚡ [CompanyService] 正在同步更新 ${relatedOpportunities.length} 筆相關機會案件...`);
+                    
+                    const batchUpdates = relatedOpportunities.map(opp => ({
+                        rowIndex: opp.rowIndex,
+                        data: { customerCompany: updateData.companyName },
+                        modifier: `System (Cascade Update from ${modifier})`
+                    }));
+
+                    await this.opportunityWriter.batchUpdateOpportunities(batchUpdates);
+                    logs.push(`已自動同步更新 ${relatedOpportunities.length} 筆關聯機會案件的客戶名稱`);
+                }
+
+                // (可選) 若有潛在聯絡人 (Raw Contacts) 使用字串關聯，也可以在此處加入連動
+                // ...
+
+            } catch (cascadeError) {
+                console.error(`❌ [CompanyService] 連動更新失敗:`, cascadeError);
+                logs.push(`⚠️ 警告: 關聯資料同步失敗 (${cascadeError.message})，請聯繫管理員檢查資料一致性`);
+            }
+        }
+
+        // 3. 寫入日誌
         if (updateResult.success && logs.length > 0) {
             await this._logCompanyInteraction(
                 originalCompany.companyId,

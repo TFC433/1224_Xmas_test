@@ -27,9 +27,7 @@ class CompanyWriter extends BaseWriter {
      * @returns {Promise<object>}
      */
     async getOrCreateCompany(companyName, contactInfo, modifier, opportunityData) {
-        // 【修改】擴大範圍以匹配新的工作表結構
         const range = `${this.config.SHEETS.COMPANY_LIST}!A:M`;
-        // 使用注入的 companyReader 進行操作
         const existingCompany = await this.companyReader.findRowByValue(range, 1, companyName);
 
         if (existingCompany) {
@@ -46,7 +44,6 @@ class CompanyWriter extends BaseWriter {
         const now = new Date().toISOString();
         const newCompanyId = `COM${Date.now()}`;
         
-        // 【修改】在建立新公司時，為新欄位提供預設空值
         const newRow = [
             newCompanyId, companyName,
             contactInfo.phone || contactInfo.mobile || '',
@@ -67,7 +64,6 @@ class CompanyWriter extends BaseWriter {
             resource: { values: [newRow] }
         });
         
-        // 清除 CompanyList 的快取
         this.companyReader.invalidateCache('companyList');
 
         const updatedRange = response.data.updates.updatedRange;
@@ -79,14 +75,13 @@ class CompanyWriter extends BaseWriter {
 
     /**
      * 更新公司資料
-     * @param {string} companyName - 公司名稱
-     * @param {object} updateData - 要更新的資料物件
+     * @param {string} companyName - (舊)公司名稱，用來尋找列
+     * @param {object} updateData - 要更新的資料物件 (若包含 companyName 則表示要改名)
      * @param {string} modifier - 操作者
      * @returns {Promise<object>}
      */
     async updateCompany(companyName, updateData, modifier) {
         console.log(`🏢 [CompanyWriter] 更新公司資料: ${companyName} by ${modifier}`);
-        // 【修改】擴大範圍以匹配新的工作表結構
         const range = `${this.config.SHEETS.COMPANY_LIST}!A:M`;
         const companyRow = await this.companyReader.findRowByValue(range, 1, companyName);
         if (!companyRow) throw new Error(`找不到公司: ${companyName}`);
@@ -94,12 +89,14 @@ class CompanyWriter extends BaseWriter {
         const { rowIndex, rowData: currentRow } = companyRow;
         const now = new Date().toISOString();
 
+        // 【修正】這裡加入了對公司名稱 (Column Index 1) 的更新支援
+        if(updateData.companyName !== undefined) currentRow[1] = updateData.companyName;
+
         if(updateData.phone !== undefined) currentRow[2] = updateData.phone;
         if(updateData.address !== undefined) currentRow[3] = updateData.address;
         if(updateData.county !== undefined) currentRow[6] = updateData.county;
         if(updateData.introduction !== undefined) currentRow[9] = updateData.introduction;
         
-        // 【修改】增加對新欄位的更新邏輯
         if(updateData.companyType !== undefined) currentRow[10] = updateData.companyType;
         if(updateData.customerStage !== undefined) currentRow[11] = updateData.customerStage;
         if(updateData.engagementRating !== undefined) currentRow[12] = updateData.engagementRating;
@@ -109,7 +106,6 @@ class CompanyWriter extends BaseWriter {
 
         await this.sheets.spreadsheets.values.update({
             spreadsheetId: this.config.SPREADSHEET_ID,
-            // 【修改】擴大更新範圍
             range: `${this.config.SHEETS.COMPANY_LIST}!A${rowIndex}:M${rowIndex}`,
             valueInputOption: 'USER_ENTERED',
             resource: { values: [currentRow] }
@@ -121,7 +117,7 @@ class CompanyWriter extends BaseWriter {
     }
 
     /**
-     * 【新增】刪除一間公司
+     * 刪除一間公司
      * @param {string} companyName - 要刪除的公司名稱
      * @returns {Promise<object>}
      */
@@ -129,7 +125,6 @@ class CompanyWriter extends BaseWriter {
         console.log(`🗑️ [CompanyWriter] 準備刪除公司: ${companyName}`);
         const range = `${this.config.SHEETS.COMPANY_LIST}!A:M`;
         
-        // 依賴注入的 reader 查找
         const companyRow = await this.companyReader.findRowByValue(range, 1, companyName);
         if (!companyRow) {
             throw new Error(`找不到公司: ${companyName}`);
@@ -137,16 +132,14 @@ class CompanyWriter extends BaseWriter {
 
         const { rowIndex } = companyRow;
 
-        // 呼叫 BaseWriter 的輔助函式來刪除
         await this._deleteRow(
             this.config.SHEETS.COMPANY_LIST,
             rowIndex,
-            this.companyReader // 傳入 reader 以便清除快取
+            this.companyReader 
         );
 
-        // invalidateCache 已在 _deleteRow 中呼叫
         console.log(`✅ [CompanyWriter] 公司 "${companyName}" (Row: ${rowIndex}) 已被刪除`);
-        return { success: true, deletedCompanyId: companyRow.rowData[0] /* companyId */ };
+        return { success: true, deletedCompanyId: companyRow.rowData[0] };
     }
 }
 

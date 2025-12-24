@@ -95,7 +95,6 @@ class OpportunityWriter extends BaseWriter {
         if(updateData.channelDetails !== undefined) setValue(FIELD_NAMES.CHANNEL, updateData.channelDetails);
         if(updateData.channelContact !== undefined) setValue(FIELD_NAMES.CHANNEL_CONTACT, updateData.channelContact);
 
-        // 【新增】允許更新建立時間
         if(updateData.createdTime !== undefined) setValue(FIELD_NAMES.CREATED_TIME, updateData.createdTime);
 
         setValue(FIELD_NAMES.LAST_UPDATE_TIME, now);
@@ -145,8 +144,11 @@ class OpportunityWriter extends BaseWriter {
                 if (idx !== undefined && idx >= 0) currentRow[idx] = val;
             };
 
+            // 【修改】擴充支援的批量更新欄位
             if (updateData.currentStage !== undefined) setVal(FIELD_NAMES.STAGE, updateData.currentStage);
             if (updateData.stageHistory !== undefined) setVal(FIELD_NAMES.HISTORY, updateData.stageHistory);
+            // 支援更新客戶名稱 (for cascade update)
+            if (updateData.customerCompany !== undefined) setVal(FIELD_NAMES.CUSTOMER, updateData.customerCompany);
 
             setVal(FIELD_NAMES.LAST_UPDATE_TIME, now);
             setVal(FIELD_NAMES.LAST_MODIFIER, modifier);
