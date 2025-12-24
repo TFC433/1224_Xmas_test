@@ -58,7 +58,7 @@ const SalesAnalysisComponents = {
                     <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
                         <div class="form-group" style="margin-bottom: 0;"><label class="form-label" style="font-size: 0.8rem;">開始日期</label><input type="date" id="sales-start-date" class="form-input form-input-sm" value="${start}"></div>
                         <div class="form-group" style="margin-bottom: 0;"><label class="form-label" style="font-size: 0.8rem;">結束日期</label><input type="date" id="sales-end-date" class="form-input form-input-sm" value="${end}"></div>
-                        <button class="action-btn primary" style="height: 40px; margin-top: 20px;" onclick="refreshSalesAnalysis()">查詢</button>
+                        <button id="sales-refresh-btn" class="action-btn primary" style="height: 40px; margin-top: 20px;">查詢</button>
                     </div>
                 </div>
                 <div id="sales-overview-content" class="widget-content"><div class="loading show"><div class="spinner"></div></div></div>

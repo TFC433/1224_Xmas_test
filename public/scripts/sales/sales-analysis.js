@@ -38,6 +38,12 @@ async function loadSalesAnalysisPage(startDateISO, endDateISO) {
     // 2. 渲染基礎骨架
     container.innerHTML = SalesAnalysisComponents.getMainLayout(salesStartDate, salesEndDate);
 
+    // 綁定查詢按鈕事件
+    const refreshBtn = document.getElementById('sales-refresh-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', refreshSalesAnalysis);
+    }
+
     // 3. 獲取數據
     await fetchAndRenderSalesData(salesStartDate, salesEndDate);
 }
