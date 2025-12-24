@@ -83,7 +83,7 @@ class SalesAnalysisService {
         console.log(`   - 找到 ${allWonOpportunities.length} 筆成交案件 (含所有歷史資料)`);
 
         // 4. 準備成交案件列表 (完整列表，並進行初始排序)
-        const wonDeals = allWonOpportunities
+        let wonDeals = allWonOpportunities
             .map(opp => ({
                 ...opp,
                 numericValue: parseFloat(String(opp.opportunityValue || '0').replace(/,/g, '')) || 0,
@@ -98,6 +98,16 @@ class SalesAnalysisService {
                 const valB = isNaN(timeB) ? 0 : timeB;
                 return valB - valA; // 預設依日期降序
             });
+
+        // 依據時間範圍過濾
+        if (startDate && endDate) {
+            wonDeals = wonDeals.filter(deal => {
+                const dealDate = new Date(deal.wonDate);
+                // 比較時只考慮日期部分，或直接比較時間戳
+                // startDate 和 endDate 已經被處理為當天的 00:00:00 和 23:59:59
+                return dealDate >= startDate && dealDate <= endDate;
+            });
+        }
 
         // 5. 初始概覽 (Overview)
         const overview = this._calculateOverview(wonDeals);
